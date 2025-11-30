@@ -1,166 +1,226 @@
+---
+
 # Parse_LFS
 
-`Parse_LFS` is a tool designed to analyze and reconstruct the structure of a **Log-Structured File System (LFS)** from a raw disk image.
-It reads metadata and data blocks stored in the image, rebuilds the file system hierarchy, and supports two primary operations:
+`Parse_LFS` is a tool for reading and interpreting a Log-Structured File System (LFS) disk image.
+It supports:
 
-* Listing all files and directories in the LFS image (`ls`)
-* Reading and printing the contents of a specified file (`cat`)
+* Printing the full LFS directory tree (`ls`)
+* Extracting and printing the contents of a file inside the LFS image (`cat`)
 
-This project demonstrates how an LFS organizes data (inodes, imaps, data blocks) and how to reconstruct files from the log.
+The tool reconstructs filesystem metadata and structure by parsing Checkpoint Regions, Imaps, Inodes, and data blocks inside the image.
 
-## Features
+---
 
-### 🔹 **1. Print LFS Tree (`ls`)**
+## ✨ Features
 
+### ✔ List the LFS directory tree (`ls`)
+
+```
 $ ./bin/parse_lfs ls ./sample_files/a.img
 /
          256 2025-04-15 19:00:18 UTC -rw-------    bar.txt
-         ...
+           0 2025-04-15 19:00:18 UTC -rw-------    foo.txt
+           ...
+```
 
-`ls` recursively prints the entire directory tree, starting from the root `/`.
+* Displays a hierarchical file tree starting from the root (`/`)
+* Files are sorted alphabetically; directories appear *after* files at each depth
+* Indentation reflects directory depth
+* Uses the provided `ls_print_file()` helper for consistent formatting
 
-Output formatting details:
+---
 
-* Indentation reflects directory depth.
-* Items are **sorted alphabetically**.
-* **Directories are listed after files** at each depth level.
+### ✔ Print file contents (`cat`)
 
-### 🔹 **2. Print File Contents (`cat`)**
-
+```
 $ ./bin/parse_lfs cat /bar.txt ./sample_files/a.img
-<file content>
+revised to the end of modernizing
+and improving them"...
+```
 
-The `cat` operation searches for a given path, locates the corresponding inode, reads its data blocks, and prints only the **valid file content** (excluding any unused padding bytes).
+* Follows the given absolute path and outputs the file content
+* Supports `.` and `..` logically (though they do not exist in the image)
+* Paths must start with `/`
+* If the file cannot be found, the program prints:
 
-Supports logical path navigation such as:
-
-/dir/b/bar.txt
-/dir/./b/bar.txt
-/dir/c/../b/bar.txt
-
-### 🔸 Error Handling
-
-If the path does not exist or the file cannot be found:
-
+```
 parse_lfs error: Failed to find file.
+```
 
-Exit code: `1`
+and returns exit code `1`.
 
-## LFS Image Structure
+---
 
-### 🧩 **1. Checkpoint Region (CR)**
+## 📚 Background
 
-Each LFS image begins with a 1 KB checkpoint region:
+LFS (Log-Structured File System) writes metadata and data in sequential log segments to optimize write performance and reduce random I/O.
+This project focuses on understanding how LFS organizes its structures and reconstructing filesystem information from a raw image.
 
+If you want to learn more about LFS concepts:
+
+* File System Implementation
+* Log-Structured File Systems
+
+---
+
+## 🗂 LFS Image Format Overview
+
+LFS images contain:
+
+* **1 KB metadata blocks** (Checkpoint Region, Imap, Inode)
+* **4 KB data blocks** (file and directory data)
+
+### 1. Checkpoint Region (CR, 1 KB)
+
+```
 uint Image_Offset
 uint Entry_Count
 
-// Repeated CR entries:
+// repeated Entry_Count times
 uint inumber_start
 uint inumber_end
 uint imap_disk_offset
+```
 
-Each CR entry points to an imap and defines which inode range it maps.
+Each entry maps a range of inumbers to the location of an Imap block.
 
-### 🧩 **2. Imaps**
+---
 
-Each imap is also a 1 KB metadata block:
+### 2. Imap (1 KB)
 
+```
 uint Entry_Count
 
-// Repeated entries:
+// repeated
 uint inumber
 uint inode_disk_offset
+```
 
-This table maps inumbers to the disk offsets of their inode structures.
+Each entry points to the location of one inode.
 
-### 🧩 **3. Inodes**
+---
 
-Each inode is stored in a 1 KB region:
+### 3. Inode (1 KB)
 
+```
 uint    file_cursor
 uint    size
 mode_t  permissions
 time_t  mtime
+
 uint    Direct_Block_Count
 
-// Direct block offsets:
 uint direct_block_disk_offset
-uint direct_block_disk_offset
+...
+```
 
-Only **direct blocks** are supported (no indirect blocks).
+* Includes only direct block pointers (no indirects)
+* `size` is the actual file size—not necessarily equal to total data block space
 
-### 🧩 **4. Data Blocks**
+---
 
-Each data block is 4 KB.
+### 4. Data Blocks (4 KB)
 
-* Regular files contain raw bytes.
-* Directories contain repeated entries in the form:
+**Regular file:** raw bytes
+**Directory:** sequence of entries
 
-fileName,    // not null-terminated, ends with comma
+```
+char name[]   // ends with ',', not null-terminated
 uint inumber
+```
 
-Example directory block:
+For example:
 
+```
 a,5
 b,6
 c,7
-Entries in directory blocks are *not guaranteed to be sorted*.
+```
 
-## Implementation Overview
+Entries in directories are **not guaranteed to be sorted**.
 
-Typical parsing flow:
+---
 
-1. Read and validate the Checkpoint Region.
-2. Load all imaps referenced by the CR.
-3. Load all inodes referenced by the imaps.
-4. Build the directory tree in memory.
-5. Handle `ls` and `cat` operations.
+## 🔍 How Files Are Located
 
-## Build Instructions
+To find the data block for an inode:
 
-Compile with:
+1. Read the CR and locate the Imap responsible for the inumber
+2. Read that Imap to find the inode’s location
+3. Read the inode
+4. Use direct block offsets to access data blocks
 
-bash
-make
+---
 
-The resulting executable is located at:
+## 🧩 Suggested Implementation Structure
 
-./bin/parse_lfs
+A practical development path:
 
-## Usage
+1. Parse the Checkpoint Region
+2. Parse each Imap listed in the CR
+3. Parse each referenced Inode
+4. Build in-memory structures for easy traversal
+5. Implement `ls`
+6. Implement `cat`
 
-### **List all files**
+Start with the simplest sample image (`simple.img`) before testing more complex cases.
 
-./bin/parse_lfs ls <image_file>
+---
 
-### **Print a file’s contents**
+## 📦 Project Structure
 
-./bin/parse_lfs cat <path_in_lfs> <image_file>
-
-Example:
-
-./bin/parse_lfs cat /dir/foo.txt ./sample_files/a.img
-
-## Project Structure
-
+```
 Parse_LFS/
-├── src/
-│   ├── parse_lfs.c
-│   ├── parse_lfs.h
-├── sample_files/
-├── bin/
-└── README.md
+├─ src/
+│   ├─ parse_lfs.c
+│   ├─ parse_lfs.h
+├─ sample_files/
+│   ├─ a.img
+│   ├─ simple.img
+├─ tests/
+└─ README.md
+```
 
-## Testing
+---
 
-Sample LFS images are provided under `sample_files/` for basic testing:
+## ▶ Usage
 
-./bin/parse_lfs ls ./sample_files/simple.img
+### List filesystem tree
 
-Users can create additional LFS images for extended testing.
+```
+./bin/parse_lfs ls <image_file>
+```
 
-## License
+### Print file contents
 
-This project is intended for personal learning and research.
-You are free to modify or extend it.
+```
+./bin/parse_lfs cat <absolute_path> <image_file>
+```
+
+---
+
+## ❗ Error Handling
+
+If the specified file cannot be found:
+
+```
+parse_lfs error: Failed to find file.
+```
+
+Program exits with code **1**.
+
+---
+
+## 🧪 Testing
+
+Sample tests are included:
+
+```
+cd tests/
+./run-tests.sh
+```
+
+Use the `-h` flag for additional options.
+
+---
