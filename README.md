@@ -1,6 +1,3 @@
-Below is the **English version** of the rewritten README, adapted as a standalone personal project (not a course assignment).
-You can directly use this as your `README.md`.
-
 # Parse_LFS
 
 `Parse_LFS` is a tool designed to analyze and reconstruct the structure of a **Log-Structured File System (LFS)** from a raw disk image.
