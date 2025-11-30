@@ -58,11 +58,6 @@ and returns exit code `1`.
 LFS (Log-Structured File System) writes metadata and data in sequential log segments to optimize write performance and reduce random I/O.
 This project focuses on understanding how LFS organizes its structures and reconstructing filesystem information from a raw image.
 
-If you want to learn more about LFS concepts:
-
-* File System Implementation
-* Log-Structured File Systems
-
 ---
 
 ## 🗂 LFS Image Format Overview
