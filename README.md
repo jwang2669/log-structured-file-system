@@ -149,7 +149,7 @@ To find the data block for an inode:
 
 ---
 
-## 🧩 Suggested Implementation Structure
+## 🧩 Implementation Structure
 
 A practical development path:
 
