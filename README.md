@@ -164,22 +164,6 @@ Start with the simplest sample image (`simple.img`) before testing more complex 
 
 ---
 
-## 📦 Project Structure
-
-```
-Parse_LFS/
-├─ src/
-│   ├─ parse_lfs.c
-│   ├─ parse_lfs.h
-├─ sample_files/
-│   ├─ a.img
-│   ├─ simple.img
-├─ tests/
-└─ README.md
-```
-
----
-
 ## ▶ Usage
 
 ### List filesystem tree
